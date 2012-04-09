@@ -1,0 +1,11 @@
+Python binding of PCRE (Perl Compatible Regular Expressions) library that supports JIT compilation of patterns.
+
+PCRE: 		http://www.pcre.org/
+PCRE+JIT: 	http://sljit.sourceforge.net/pcre.html
+
+Dependencies:
+	- Python 2.7
+	- PCRE 8.30
+
+Notes:
+	- PCRE is compiled without JIT support by default. 
