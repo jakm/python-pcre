@@ -29,14 +29,6 @@
 #include <Python.h>
 #include <pcre.h>
 
-#define IGNORECASE 2
-#define LOCALE 4
-#define MULTILINE 8
-#define DOTALL 16
-#define UNICODE 32
-#define VERBOSE 64
-#define DEBUG 128
-
 static int jit_enabled;
 
 /*
@@ -319,19 +311,42 @@ init_pcre(void)
 
     m = Py_InitModule("_pcre", pcre_functions);
 
-    PyModule_AddIntConstant(m, "IGNORECASE", IGNORECASE);
-    PyModule_AddIntConstant(m, "I", IGNORECASE);
-    PyModule_AddIntConstant(m, "LOCALE", LOCALE);
-    PyModule_AddIntConstant(m, "L", LOCALE);
-    PyModule_AddIntConstant(m, "MULTILINE", MULTILINE);
-    PyModule_AddIntConstant(m, "M", MULTILINE);
-    PyModule_AddIntConstant(m, "DOTALL", DOTALL);
-    PyModule_AddIntConstant(m, "S", DOTALL);
-    PyModule_AddIntConstant(m, "UNICODE", UNICODE);
-    PyModule_AddIntConstant(m, "U", UNICODE);
-    PyModule_AddIntConstant(m, "VERBOSE", VERBOSE);
-    PyModule_AddIntConstant(m, "X", VERBOSE);
-    PyModule_AddIntConstant(m, "DEBUG", DEBUG);
+    PyModule_AddIntConstant(m, "PCRE_CASELESS", PCRE_CASELESS);
+    PyModule_AddIntConstant(m, "PCRE_MULTILINE", PCRE_MULTILINE);
+    PyModule_AddIntConstant(m, "PCRE_DOTALL", PCRE_DOTALL);
+    PyModule_AddIntConstant(m, "PCRE_EXTENDED", PCRE_EXTENDED);
+    PyModule_AddIntConstant(m, "PCRE_ANCHORED", PCRE_ANCHORED);
+    PyModule_AddIntConstant(m, "PCRE_DOLLAR_ENDONLY", PCRE_DOLLAR_ENDONLY);
+    PyModule_AddIntConstant(m, "PCRE_EXTRA", PCRE_EXTRA);
+    PyModule_AddIntConstant(m, "PCRE_NOTBOL", PCRE_NOTBOL);
+    PyModule_AddIntConstant(m, "PCRE_NOTEOL", PCRE_NOTEOL);
+    PyModule_AddIntConstant(m, "PCRE_UNGREEDY", PCRE_UNGREEDY);
+    PyModule_AddIntConstant(m, "PCRE_NOTEMPTY", PCRE_NOTEMPTY);
+    PyModule_AddIntConstant(m, "PCRE_UTF8", PCRE_UTF8);
+    PyModule_AddIntConstant(m, "PCRE_UTF16", PCRE_UTF16);
+    PyModule_AddIntConstant(m, "PCRE_NO_AUTO_CAPTURE", PCRE_NO_AUTO_CAPTURE);
+    PyModule_AddIntConstant(m, "PCRE_NO_UTF8_CHECK", PCRE_NO_UTF8_CHECK);
+    PyModule_AddIntConstant(m, "PCRE_NO_UTF16_CHECK", PCRE_NO_UTF16_CHECK);
+    PyModule_AddIntConstant(m, "PCRE_AUTO_CALLOUT", PCRE_AUTO_CALLOUT);
+    PyModule_AddIntConstant(m, "PCRE_PARTIAL_SOFT", PCRE_PARTIAL_SOFT);
+    PyModule_AddIntConstant(m, "PCRE_PARTIAL", PCRE_PARTIAL);
+    PyModule_AddIntConstant(m, "PCRE_DFA_SHORTEST", PCRE_DFA_SHORTEST);
+    PyModule_AddIntConstant(m, "PCRE_DFA_RESTART", PCRE_DFA_RESTART);
+    PyModule_AddIntConstant(m, "PCRE_FIRSTLINE", PCRE_FIRSTLINE);
+    PyModule_AddIntConstant(m, "PCRE_DUPNAMES", PCRE_DUPNAMES);
+    PyModule_AddIntConstant(m, "PCRE_NEWLINE_CR", PCRE_NEWLINE_CR);
+    PyModule_AddIntConstant(m, "PCRE_NEWLINE_LF", PCRE_NEWLINE_LF);
+    PyModule_AddIntConstant(m, "PCRE_NEWLINE_CRLF", PCRE_NEWLINE_CRLF);
+    PyModule_AddIntConstant(m, "PCRE_NEWLINE_ANYCRLF", PCRE_NEWLINE_ANYCRLF);
+    PyModule_AddIntConstant(m, "PCRE_BSR_ANYCRLF", PCRE_BSR_ANYCRLF);
+    PyModule_AddIntConstant(m, "PCRE_BSR_UNICODE", PCRE_BSR_UNICODE);
+    PyModule_AddIntConstant(m, "PCRE_JAVASCRIPT_COMPAT", PCRE_JAVASCRIPT_COMPAT);
+    PyModule_AddIntConstant(m, "PCRE_NO_START_OPTIMIZE", PCRE_NO_START_OPTIMIZE);
+    PyModule_AddIntConstant(m, "PCRE_NO_START_OPTIMISE", PCRE_NO_START_OPTIMISE);
+    PyModule_AddIntConstant(m, "PCRE_PARTIAL_HARD", PCRE_PARTIAL_HARD);
+    PyModule_AddIntConstant(m, "PCRE_NOTEMPTY_ATSTART", PCRE_NOTEMPTY_ATSTART);
+    PyModule_AddIntConstant(m, "PCRE_UCP", PCRE_UCP);
+
 
     const int utf8_enabled;
     if(pcre_config(PCRE_CONFIG_UTF8, &utf8_enabled) < 0) {
