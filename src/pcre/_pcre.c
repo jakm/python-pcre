@@ -38,10 +38,11 @@ static int jit_enabled;
 typedef struct {
     PyObject_HEAD
     /* public members */
-    const char *pattern;
-    int *flags;
+    char *pattern;
+    int flags;
     PyObject *groupindex;
-    int *groups;
+    int groups;
+    int optimized;
     /* private members */
     // TODO: tezko rict jak to bude vypadat dale, ale pokud to budu potrebovat predavat i do match objektu, tak bude lepsi udelat
     // explicitni strukturu
@@ -79,14 +80,22 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 		return 0;
 	}
 
-	if (!jit_enabled)
+	if (!self->optimized)
 		return 1;
 
-	self->extra = pcre_study(self->re, PCRE_STUDY_JIT_COMPILE, &error);
+	int options = 0;
+	if (jit_enabled)
+		options |= PCRE_STUDY_JIT_COMPILE;
+
+	self->extra = pcre_study(self->re, options, &error);
 	if (error != NULL) {
 		// TODO: error
 		return 0;
 	}
+
+	if (!jit_enabled)
+		return 1;
+
 	self->jit_stack = pcre_jit_stack_alloc(32*1024, 512*1024);
 	if (self->jit_stack == NULL) {
 		// TODO: Check for error (NULL)
@@ -100,16 +109,15 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 static int
 pcre_RegexObject_init(pcre_RegexObject *self, PyObject *args, PyObject *kwds)
 {
-	self->flags = 0;
-    self->groups = 0;
-    self->groupindex = Py_BuildValue("{}");
+	self->optimized = 1;
+    self->groupindex = Py_BuildValue("{}"); // FIXME: zjistit, zda tyto funkce zvysuji pocitadlo objektu!!!
     if (self->groupindex == NULL)
     	return -1;
 
-    static char *kwlist[] = {"pattern", "flags", NULL};
+    static char *kwlist[] = {"pattern", "flags", "optimize", NULL};
 
-    const char *tmp;
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s|i", kwlist, &tmp, &self->flags))
+    char *tmp;
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwlist, &tmp, &self->flags, &self->optimized))
         return -1;
 
     int len = strlen(tmp) + 1;
@@ -147,11 +155,19 @@ pcre_RegexObject_getpattern(pcre_RegexObject *self, void *closure)
 	return Py_BuildValue("s", self->pattern);
 }
 
+static PyObject *
+pcre_RegexObject_getoptimized(pcre_RegexObject *self, void *closure)
+{
+	return Py_BuildValue("i", self->optimized);
+}
+
+// TODO: doplnit docstringy
 static PyGetSetDef pcre_RegexObject_getseters[] = {
     {"flags", (getter)pcre_RegexObject_getflags, NULL, NULL, NULL},
     {"groupindex", (getter)pcre_RegexObject_getgroupindex, NULL, NULL, NULL},
     {"groups", (getter)pcre_RegexObject_getgroups, NULL, NULL, NULL},
     {"pattern", (getter)pcre_RegexObject_getpattern, NULL, NULL, NULL},
+    {"optimized", (getter)pcre_RegexObject_getoptimized, NULL, NULL, NULL},
     {NULL}  /* Sentinel */
 };
 
