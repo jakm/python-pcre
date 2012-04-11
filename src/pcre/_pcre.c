@@ -148,11 +148,6 @@ pcre_RegexObject_init(pcre_RegexObject *self, PyObject *args, PyObject *kwds)
 			&self->use_jit, &self->jit_stack_init, &self->jit_stack_max))
 		return -1;
 
-	if (tmp == NULL) {
-		PyErr_SetString(PyExc_TypeError, "The pattern parameter must be a string.");
-		return -1;
-	}
-
 	int len = strlen(tmp) + 1;
 	self->pattern = (char *)malloc(len * sizeof(char));
 	strcpy(self->pattern, tmp);
