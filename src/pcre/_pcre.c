@@ -91,7 +91,7 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 
 	if (!self->optimize && self->use_jit) {
 		PyErr_SetString(PcreError, "Invalid combination of arguments. To enable JIT you must enable pattern optimization.");
-		return -1;
+		return 0;
 	}
 
 	if (!self->optimize)
@@ -102,7 +102,7 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 	if (self->use_jit) {
 		if (!jit_enabled) {
 			PyErr_SetString(PcreError, "Current version of libpcre is compiled without JIT support.");
-			return -1;
+			return 0;
 		}
 
 		options |= PCRE_STUDY_JIT_COMPILE;
