@@ -544,6 +544,7 @@ init_pcre(void)
 	Py_INCREF(PcreError);
 	PyModule_AddObject(m, "PcreError", PcreError);
 
+	// libpcre constants
 	PyModule_AddIntConstant(m, "PCRE_CASELESS", PCRE_CASELESS);
 	PyModule_AddIntConstant(m, "PCRE_MULTILINE", PCRE_MULTILINE);
 	PyModule_AddIntConstant(m, "PCRE_DOTALL", PCRE_DOTALL);
@@ -580,7 +581,11 @@ init_pcre(void)
 	PyModule_AddIntConstant(m, "PCRE_NOTEMPTY_ATSTART", PCRE_NOTEMPTY_ATSTART);
 	PyModule_AddIntConstant(m, "PCRE_UCP", PCRE_UCP);
 
+	// _pcre constants
+	PyModule_AddIntConstant(m, "JIT_STACK_INIT_SIZE", JIT_STACK_INIT_DEFAULT);
+	PyModule_AddIntConstant(m, "JIT_STACK_MAX_SIZE", JIT_STACK_MAX_DEFAULT);
 
+	// run-time checking of utf8 support
 	const int utf8_enabled;
 	if(pcre_config(PCRE_CONFIG_UTF8, &utf8_enabled) < 0) {
 		PyErr_SetString(PyExc_RuntimeError, "Error when querying PCRE_CONFIG_UTF8.");
