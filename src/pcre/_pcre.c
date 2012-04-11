@@ -32,6 +32,12 @@
 static int jit_enabled;
 
 /*
+ * EXCEPTIONS
+ */
+
+static PyObject *PcreError;
+
+/*
  * CLASSES
  */
 
@@ -42,7 +48,10 @@ typedef struct {
     int flags;
     PyObject *groupindex;
     int groups;
-    int optimized;
+    int optimize;
+    int use_jit;
+    int jit_stack_init;
+    int jit_stack_max;
     /* private members */
     // TODO: tezko rict jak to bude vypadat dale, ale pokud to budu potrebovat predavat i do match objektu, tak bude lepsi udelat
     // explicitni strukturu
@@ -80,12 +89,24 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 		return 0;
 	}
 
-	if (!self->optimized)
+	if (!self->optimize && self->use_jit) {
+		PyErr_SetString(PcreError, "Invalid combination of arguments. To enable JIT you must enable pattern optimization.");
+		return -1;
+	}
+
+	if (!self->optimize)
 		return 1;
 
 	int options = 0;
-	if (jit_enabled)
+
+	if (self->use_jit) {
+		if (!jit_enabled) {
+			PyErr_SetString(PcreError, "Current version of libpcre is compiled without JIT support.");
+			return -1;
+		}
+
 		options |= PCRE_STUDY_JIT_COMPILE;
+	}
 
 	self->extra = pcre_study(self->re, options, &error);
 	if (error != NULL) {
@@ -93,10 +114,12 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 		return 0;
 	}
 
-	if (!jit_enabled)
+	if (!self->use_jit)
 		return 1;
 
-	self->jit_stack = pcre_jit_stack_alloc(32*1024, 512*1024);
+	// TODO: zkontrolovat, jak se to bude chovat s "neobvyklymi" parametry stacku
+
+	self->jit_stack = pcre_jit_stack_alloc(self->jit_stack_init, self->jit_stack_max);
 	if (self->jit_stack == NULL) {
 		// TODO: Check for error (NULL)
 		return 0;
@@ -106,19 +129,29 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 	return 1;
 }
 
+#define JIT_STACK_INIT_DEFAULT 32*1024
+#define JIT_STACK_MAX_DEFAULT 512*1024
+
 static int
 pcre_RegexObject_init(pcre_RegexObject *self, PyObject *args, PyObject *kwds)
 {
-	self->optimized = 1;
+	self->jit_stack_init = JIT_STACK_INIT_DEFAULT;
+	self->jit_stack_max = JIT_STACK_MAX_DEFAULT;
     self->groupindex = Py_BuildValue("{}"); // FIXME: zjistit, zda tyto funkce zvysuji pocitadlo objektu!!!
     if (self->groupindex == NULL)
     	return -1;
 
-    static char *kwlist[] = {"pattern", "flags", "optimize", NULL};
+    static char *kwlist[] = {"pattern", "flags", "optimize", "use_jit", "jit_stack_init", "jit_stack_max", NULL};
 
     char *tmp;
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwlist, &tmp, &self->flags, &self->optimized))
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "s|iiiii", kwlist, &tmp, &self->flags, &self->optimize,
+    		&self->use_jit, &self->jit_stack_init, &self->jit_stack_max))
         return -1;
+
+    if (tmp == NULL) {
+    	PyErr_SetString(PyExc_TypeError, "The pattern parameter must be a string.");
+    	return -1;
+    }
 
     int len = strlen(tmp) + 1;
     self->pattern = (char *)malloc(len * sizeof(char));
@@ -158,7 +191,13 @@ pcre_RegexObject_getpattern(pcre_RegexObject *self, void *closure)
 static PyObject *
 pcre_RegexObject_getoptimized(pcre_RegexObject *self, void *closure)
 {
-	return Py_BuildValue("i", self->optimized);
+	return Py_BuildValue("i", self->optimize);
+}
+
+static PyObject *
+pcre_RegexObject_getusejit(pcre_RegexObject *self, void *closure)
+{
+	return Py_BuildValue("i", self->use_jit);
 }
 
 // TODO: doplnit docstringy
@@ -168,6 +207,7 @@ static PyGetSetDef pcre_RegexObject_getseters[] = {
     {"groups", (getter)pcre_RegexObject_getgroups, NULL, NULL, NULL},
     {"pattern", (getter)pcre_RegexObject_getpattern, NULL, NULL, NULL},
     {"optimized", (getter)pcre_RegexObject_getoptimized, NULL, NULL, NULL},
+    {"use_jit", (getter)pcre_RegexObject_getusejit, NULL, NULL, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -323,9 +363,15 @@ init_pcre(void)
 	PyObject* m;
 
 	if (PyType_Ready(&pcre_RegexType) < 0)
-		return;
+	    	return;
 
     m = Py_InitModule("_pcre", pcre_functions);
+    if (m == NULL)
+    	return;
+
+    PcreError = PyErr_NewException("_pcre.PcreError", NULL, NULL);
+    Py_INCREF(PcreError);
+    PyModule_AddObject(m, "PcreError", PcreError);
 
     PyModule_AddIntConstant(m, "PCRE_CASELESS", PCRE_CASELESS);
     PyModule_AddIntConstant(m, "PCRE_MULTILINE", PCRE_MULTILINE);
@@ -366,12 +412,12 @@ init_pcre(void)
 
     const int utf8_enabled;
     if(pcre_config(PCRE_CONFIG_UTF8, &utf8_enabled) < 0) {
-    	PyErr_SetString(PyExc_RuntimeError, "PCRE: Error when querying PCRE_CONFIG_UTF8.");
-    	return NULL;
+    	PyErr_SetString(PyExc_RuntimeError, "Error when querying PCRE_CONFIG_UTF8.");
+    	return;
     }
     if(!utf8_enabled) {
-    	PyErr_SetString(PyExc_RuntimeError, "PCRE: Current version doesn't support UTF8.");
-    	return NULL;
+    	PyErr_SetString(PyExc_RuntimeError, "Current version of libpcre is compiled without UTF8 support.");
+    	return;
     }
 
     // run-time checking of jit support
