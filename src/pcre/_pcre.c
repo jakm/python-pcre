@@ -30,6 +30,7 @@
 #include <pcre.h>
 
 static int jit_enabled;
+static char message_buffer[150];
 
 /*
  * EXCEPTIONS
@@ -53,8 +54,6 @@ typedef struct {
 	int jit_stack_init;
 	int jit_stack_max;
 	/* private members */
-	// TODO: tezko rict jak to bude vypadat dale, ale pokud to budu potrebovat predavat i do match objektu, tak bude lepsi udelat
-	// explicitni strukturu
 	pcre *re;
 	pcre_extra *extra;
 	pcre_jit_stack *jit_stack;
@@ -80,12 +79,13 @@ pcre_RegexObject_dealloc(pcre_RegexObject* self)
 static int
 pcre_RegexObject_initpcre(pcre_RegexObject *self)
 {
-	const char *error;
+	char *error;
 	int erroffset;
 
 	self->re = pcre_compile(self->pattern, self->flags, &error, &erroffset, NULL);
 	if (self->re == NULL) {
-	  	// TODO: Check for errors - error, erroffset
+	  	sprintf(message_buffer, "Pattern compilation error at offset %d: %s", erroffset, error);
+		PyErr_SetString(PcreError, message_buffer);
 		return 0;
 	}
 
@@ -108,9 +108,10 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 		options |= PCRE_STUDY_JIT_COMPILE;
 	}
 
-	self->extra = pcre_study(self->re, options, &error);
+	self->extra = pcre_study(self->re, options, &error); // can return NULL when success
 	if (error != NULL) {
-		// TODO: error
+		sprintf(message_buffer, "Pattern study error: %s", error);
+		PyErr_SetString(PcreError, message_buffer);
 		return 0;
 	}
 
@@ -121,7 +122,7 @@ pcre_RegexObject_initpcre(pcre_RegexObject *self)
 
 	self->jit_stack = pcre_jit_stack_alloc(self->jit_stack_init, self->jit_stack_max);
 	if (self->jit_stack == NULL) {
-		// TODO: Check for error (NULL)
+		PyErr_SetString(PcreError, "JIT stack allocation exited with an error.");
 		return 0;
 	}
 	pcre_assign_jit_stack(self->extra, NULL, self->jit_stack);

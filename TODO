@@ -1,3 +1,4 @@
 * implement pcre._pcre.c
-* add configure script
+* add configure script or setup.py
 * fix pcre.__init__.py
+* fix reference counting
