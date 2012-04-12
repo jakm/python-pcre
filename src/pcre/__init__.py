@@ -29,35 +29,29 @@
 
 import sys
 import sre_compile
-import sre_parse
-import functools
 
 import re
 import _pcre
 
 # public symbols
 __all__ = [ "match", "search", "sub", "subn", "split", "findall",
-    "compile", "purge", "template", "escape", "A", "I", "L", "M", "S", "X",
-    "U", "ASCII", "IGNORECASE", "LOCALE", "MULTILINE", "DOTALL", "VERBOSE",
-    "UNICODE", "error" ]
+    "compile", "purge", "template", "escape", "I", "L", "M", "S", "X",
+    "U", "IGNORECASE", "LOCALE", "MULTILINE", "DOTALL", "VERBOSE",
+    "UNICODE", "error", "finditer" ]
 
-__version__ = "2.2.1"
+__version__ = "0.1"
 
+# TODO: fix LOCALE,UNICODE,VERBOSE
 # flags
-#A = ASCII = sre_compile.SRE_FLAG_ASCII # assume ascii "locale" # TODO: JAKM neni definovano v sre_compile
-I = IGNORECASE = sre_compile.SRE_FLAG_IGNORECASE # ignore case
+I = IGNORECASE = _pcre.PCRE_CASELESS # ignore case
 L = LOCALE = sre_compile.SRE_FLAG_LOCALE # assume current 8-bit locale
-U = UNICODE = sre_compile.SRE_FLAG_UNICODE # assume unicode "locale"
-M = MULTILINE = sre_compile.SRE_FLAG_MULTILINE # make anchors look for newline
-S = DOTALL = sre_compile.SRE_FLAG_DOTALL # make dot match newline
+U = UNICODE = sre_compile.SRE_FLAG_UNICODE # assume unicode locale
+M = MULTILINE = _pcre.PCRE_MULTILINE # make anchors look for newline
+S = DOTALL = _pcre.PCRE_DOTALL # make dot match newline
 X = VERBOSE = sre_compile.SRE_FLAG_VERBOSE # ignore whitespace and comments
 
-# sre extensions (experimental, don't rely on these)
-T = TEMPLATE = sre_compile.SRE_FLAG_TEMPLATE # disable backtracking
-DEBUG = sre_compile.SRE_FLAG_DEBUG # dump pattern after compilation
-
-# sre exception
-error = sre_compile.error
+# pcre exception
+error = _pcre.PcreError
 
 # --------------------------------------------------------------------
 # public interface
@@ -107,109 +101,66 @@ def findall(pattern, string, flags=0):
     Empty matches are included in the result."""
     return _compile(pattern, flags).findall(string)
 
-if sys.hexversion >= 0x02020000:
-    __all__.append("finditer")
-    def finditer(pattern, string, flags=0):
-        """Return an iterator over all non-overlapping matches in the
-        string.  For each match, the iterator returns a match object.
+def finditer(pattern, string, flags=0):
+    """Return an iterator over all non-overlapping matches in the
+    string.  For each match, the iterator returns a match object.
 
-        Empty matches are included in the result."""
-        return _compile(pattern, flags).finditer(string)
+    Empty matches are included in the result."""
+    return _compile(pattern, flags).finditer(string)
 
 def compile(pattern, flags=0):
     "Compile a regular expression pattern, returning a pattern object."
     return _compile(pattern, flags)
 
 def purge():
-    "Clear the regular expression caches"
-    _compile_typed.cache_clear()
-    _compile_repl.cache_clear()
+    "Clear the regular expression cache"
+    _cache.clear()
+    _cache_repl.clear()
 
-def template(pattern, flags=0):
-    "Compile a template pattern, returning a pattern object"
-    return _compile(pattern, flags|T)
-
-_alphanum_str = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890")
-_alphanum_bytes = frozenset(
-    b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890")
+_alphanum = {}
+for c in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890':
+    _alphanum[c] = 1
+del c
 
 def escape(pattern):
     "Escape all non-alphanumeric characters in pattern."
-    if isinstance(pattern, str):
-        alphanum = _alphanum_str
-        s = list(pattern)
-        for i, c in enumerate(pattern):
-            if c not in alphanum:
-                if c == "\000":
-                    s[i] = "\\000"
-                else:
-                    s[i] = "\\" + c
-        return "".join(s)
-    else:
-        alphanum = _alphanum_bytes
-        s = []
-        esc = ord(b"\\")
-        for c in pattern:
-            if c in alphanum:
-                s.append(c)
+    s = list(pattern)
+    alphanum = _alphanum
+    for i, c in enumerate(pattern):
+        if c not in alphanum:
+            if c == "\000":
+                s[i] = "\\000"
             else:
-                if c == 0:
-                    s.extend(b"\\000")
-                else:
-                    s.append(esc)
-                    s.append(c)
-        return bytes(s)
+                s[i] = "\\" + c
+    return pattern[:0].join(s)
 
 # --------------------------------------------------------------------
 # internals
 
+_cache = {}
+
 _pattern_type = type(_pcre.RegexObject("", 0))
 
-def _compile(pattern, flags):
-    return _compile_typed(type(pattern), pattern, flags)
+_MAXCACHE = 100
 
-#@functools.lru_cache(maxsize=500) # TODO: JAKM hazelo to nejake chyby - vyresit
-def _compile_typed(text_bytes_type, pattern, flags):
+def _compile(*key):
     # internal: compile pattern
+    cachekey = (type(key[0]),) + key
+    p = _cache.get(cachekey)
+    if p is not None:
+        return p
+    pattern, flags = key
     if isinstance(pattern, _pattern_type):
         if flags:
-            raise ValueError(
-                "Cannot process flags argument with a compiled pattern")
+            raise ValueError('Cannot process flags argument with a compiled pattern')
         return pattern
     if not sre_compile.isstring(pattern):
-        raise TypeError("first argument must be string or compiled pattern")
-    return _pcre.RegexObject(pattern, flags)
-
-#@functools.lru_cache(maxsize=500) # TODO: JAKM hazelo to nejake chyby - vyresit
-def _compile_repl(repl, pattern):
-    # internal: compile replacement pattern
-    return sre_parse.parse_template(repl, pattern)
-
-def _expand(pattern, match, template):
-    # internal: match.expand implementation hook
-    template = sre_parse.parse_template(template, pattern)
-    return sre_parse.expand_template(template, match)
-
-def _subx(pattern, template):
-    # internal: pattern.sub/subn implementation helper
-    template = _compile_repl(template, pattern)
-    if not template[0] and len(template[1]) == 1:
-        # literal replacement
-        return template[1][0]
-    def filter(match, template=template):
-        return sre_parse.expand_template(template, match)
-    return filter
-
-#===============================================================================
-# 
-# # register myself for pickling
-# 
-# import copyreg
-# 
-# def _pickle(p):
-#    return _compile, (p.pattern, p.flags)
-# 
-# copyreg.pickle(_pattern_type, _pickle, _compile)
-#
-#===============================================================================
+        raise TypeError('First argument must be string or compiled pattern')
+    try:
+        p = _pcre.RegexObject(pattern, flags)
+    except error, v:
+        raise error, v # invalid expression
+    if len(_cache) >= _MAXCACHE:
+        _cache.clear()
+    _cache[cachekey] = p
+    return p
