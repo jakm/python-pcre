@@ -80,7 +80,7 @@ static int
 pcre_RegexObject_getinfo(pcre_RegexObject *self)
 {
 	int rc, capturecount, namecount, nameentrysize;
-	char *nametable;
+	unsigned char *nametable;
 
 	rc = pcre_fullinfo(self->re, self->study, PCRE_INFO_CAPTURECOUNT, &capturecount);
 	if (rc != 0) {
@@ -108,14 +108,7 @@ pcre_RegexObject_getinfo(pcre_RegexObject *self)
 		return 0;
 	}
 
-	nametable = (char*)malloc(namecount * nameentrysize * sizeof(char));
-	if (nametable == NULL) {
-		PyErr_SetString(PcreError, "Error when allocating char buffer.");
-		return 0;
-	}
-	memset(nametable, 0, namecount * nameentrysize);
-
-	rc = pcre_fullinfo(self->re, self->study, PCRE_INFO_NAMETABLE, nametable);
+	rc = pcre_fullinfo(self->re, self->study, PCRE_INFO_NAMETABLE, &nametable);
 	if (rc != 0) {
 		sprintf(message_buffer,
 				"Detecting of named capturing subpatterns exited with an error (PCRE_INFO_NAMETABLE, code = %d).", rc);
@@ -133,27 +126,24 @@ pcre_RegexObject_getinfo(pcre_RegexObject *self)
 	 * 00 02 y  e  a  r  00 ??
 	 */
 
-	char* entry;
-	char pos[2];
+	unsigned char* entry = nametable;
 	for (int i = 0; i < namecount; i++) {
-		entry = nametable + (i * nameentrysize);
-		strncpy(pos, entry, 2);
 
-		// FIXME: opravit nacteni pozice (podivat se do prikladu)
-		PyObject *position = PyInt_FromLong((u_int16_t)*pos);
+		int pos = (entry[0] << 8) | entry[1];
+
+		PyObject *position = PyInt_FromLong(pos);
 		if (position == NULL) {
 			PyErr_SetString(PcreError, "An error when allocating int object.");
 			goto ERROR;
 		}
 
-		// FIXME: zjistit, zda se opravdu zarazi na nulovem bytu pri generovani str
 		if (PyDict_SetItemString(self->groupindex, entry + 2, position) < 0) { // a new copy of string is used
 			PyErr_SetString(PcreError, "An error when adding entry to dict object.");
 			goto ERROR;
 		}
-	}
 
-	free(nametable);
+		entry += nameentrysize;
+	}
 
 DONE:
 	self->groups = capturecount;
