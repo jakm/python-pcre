@@ -17,4 +17,4 @@ pcre: pcre_module.o pcre_regex.o pcre_match.o
 	$(CC) $(CFLAGS) -shared -L/usr/local/lib -lpcre pcre_module.o pcre_regex.o pcre_match.o -o _pcre.so
 
 clean:
-	-rm *.o *.so
+	-rm -f *.o *.so
