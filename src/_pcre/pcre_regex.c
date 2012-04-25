@@ -1,5 +1,4 @@
 #include <sys/types.h>
-#include <limits.h>
 
 #include "pcre_module.h"
 #include "pcre_regex.h"
@@ -113,7 +112,7 @@ pcre_RegexObject_getinfo(pcre_RegexObject *self)
 		sprintf(message_buffer,
 				"Detecting of named capturing subpatterns exited with an error (PCRE_INFO_NAMETABLE, code = %d).", rc);
 		PyErr_SetString(PcreError, message_buffer);
-		goto ERROR;
+		return 0;
 	}
 
 	/*
@@ -134,12 +133,12 @@ pcre_RegexObject_getinfo(pcre_RegexObject *self)
 		PyObject *position = PyInt_FromLong(pos);
 		if (position == NULL) {
 			PyErr_SetString(PcreError, "An error when allocating int object.");
-			goto ERROR;
+			return 0;
 		}
 
 		if (PyDict_SetItemString(self->groupindex, entry + 2, position) < 0) { // a new copy of string is used
 			PyErr_SetString(PcreError, "An error when adding entry to dict object.");
-			goto ERROR;
+			return 0;
 		}
 
 		entry += nameentrysize;
@@ -148,10 +147,6 @@ pcre_RegexObject_getinfo(pcre_RegexObject *self)
 DONE:
 	self->groups = capturecount;
 	return 1;
-
-ERROR:
-	free(nametable);
-	return 0;
 }
 
 static int
@@ -261,7 +256,8 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 		Py_RETURN_NONE;
 	}
 
-	int lastindex = strlen(subject) - 1;
+	int subject_len = strlen(subject);
+	int lastindex = subject_len - 2;
 
 	if (pos > lastindex || endpos > lastindex) {
 		Py_RETURN_NONE;
@@ -275,7 +271,7 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 
 
 	// length of substring
-	int len = endpos - pos + 1;
+	int substring_len = endpos - pos + 1;
 
 	// FIXME: jak spravne spocitat velikost vektoru???!!!
 	int ovector_size = self->groups * 3;
@@ -285,16 +281,16 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 		return NULL;
 	}
 
-	int rc = pcre_exec(self->re, self->study, subject, len, pos, 0, ovector, ovector_size);
+	int rc = pcre_exec(self->re, self->study, subject, substring_len, pos, 0, ovector, ovector_size);
 	if (rc < 0) {
 		PyErr_SetString(PcreError, "Match execution exited with an error."); // TODO: rozliseni chybovych kodu
-		return NULL;
+		goto ERROR;
 	}
 
 	pcre_MatchObject *match = PyObject_New(pcre_MatchObject, &pcre_MatchType);
 	if (match == NULL) {
 		PyErr_SetString(PcreError, "An error when allocating _pcre.MatchObject.");
-		return NULL;
+		goto ERROR;
 	}
 	Py_INCREF(match);
 
@@ -302,10 +298,24 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 	match->re = self;
 	match->offsetvector = ovector;
 
-	match->subject = (char *)malloc((lastindex + 2) * sizeof(char)); // TODO: opravit nazvy promennych pro delku retezce
+	match->subject = (char *)malloc((subject_len + 1) * sizeof(char)); // +1 for '\0'
+	if (match->subject == NULL) {
+		PyErr_SetString(PcreError, "An error when allocating the subject.");
+		goto ERROR1;
+	}
+
 	strcpy(match->subject, subject);
 
 	return match;
+
+ERROR1:
+	Py_XDECREF(self);
+	Py_XDECREF(match);
+
+ERROR:
+	free(ovector);
+
+	return NULL;
 }
 
 static PyObject *
