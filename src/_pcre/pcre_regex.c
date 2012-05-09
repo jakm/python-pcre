@@ -193,7 +193,7 @@ pcre_RegexObject_init(pcre_RegexObject *self, PyObject *args, PyObject *kwds)
 		return -1;
 
 	int len = strlen(tmp) + 1;
-	self->pattern = (char *)malloc(len * sizeof(char));
+	self->pattern = (char *)malloc(len * sizeof(char)); // FIXME: malloc error
 	strcpy(self->pattern, tmp);
 
 	if (!pcre_RegexObject_compile(self))
@@ -275,7 +275,7 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 
 	static char *kwlist[] = {"string", "pos", "endpos", NULL};
 
-	if (!PyArg_ParseTupleAndKeywords(args, keywds, "s|ii", kwlist, subject, &pos, &endpos))
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "s|ii", kwlist, &subject, &pos, &endpos))
 		return NULL;
 
 	// negative positions aren't accepted
@@ -284,7 +284,7 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 	}
 
 	int subject_len = strlen(subject);
-	int lastindex = subject_len - 2;
+	int lastindex = subject_len - 1;
 
 	if (pos > lastindex || endpos > lastindex) {
 		Py_RETURN_NONE;
@@ -310,7 +310,11 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 
 	int rc = pcre_exec(self->re, self->study, subject, substring_len, pos, 0, ovector, ovector_size);
 	if (rc < 0) {
-		PyErr_SetString(PcreError, "Match execution exited with an error."); // TODO: rozliseni chybovych kodu
+		if (rc == PCRE_ERROR_NOMATCH)
+			goto NOMATCH;
+
+		sprintf(message_buffer, "Match execution exited with an error (code = %d).", rc);
+		PyErr_SetString(PcreError, message_buffer); // TODO: rozliseni chybovych kodu
 		goto ERROR;
 	}
 
@@ -325,6 +329,9 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 	match->re = self;
 	match->offsetvector = ovector;
 
+	match->pos = pos;
+	match->endpos = endpos;
+
 	match->subject = (char *)malloc((subject_len + 1) * sizeof(char)); // +1 for '\0'
 	if (match->subject == NULL) {
 		PyErr_SetString(PcreError, "An error when allocating the subject.");
@@ -334,6 +341,10 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 	strcpy(match->subject, subject);
 
 	return match;
+
+NOMATCH:
+	free(ovector);
+	Py_RETURN_NONE;
 
 ERROR1:
 	Py_XDECREF(self);
