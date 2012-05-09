@@ -1,9 +1,9 @@
 import unittest
+import pcre
 
 class TestNamedSubstrings(unittest.TestCase):
     def setUp(self):
-        import pcre
-        pattern = r'(?<date> (?<year>(\d\d)?\d\d) - (?<month>\d\d) - (?<day>\d\d))'
+        pattern = r'(?<date>(?<year>(\d\d)?\d\d) - (?<month>\d\d) - (?<day>\d\d))'
         self.regex = pcre.compile(pattern)
     
     def test_groups_count(self):
