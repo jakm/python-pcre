@@ -327,7 +327,9 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 
 	Py_INCREF(self);
 	match->re = self;
+
 	match->offsetvector = ovector;
+	match->stringcount = rc;
 
 	match->pos = pos;
 	match->endpos = endpos;

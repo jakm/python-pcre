@@ -139,8 +139,6 @@ def escape(pattern):
 
 _cache = {}
 
-_pattern_type = type(_pcre.RegexObject("", 0))
-
 _MAXCACHE = 100
 
 def _compile(*key):
@@ -150,7 +148,7 @@ def _compile(*key):
     if p is not None:
         return p
     pattern, flags = key
-    if isinstance(pattern, _pattern_type):
+    if isinstance(pattern, _pcre.RegexObject):
         if flags:
             raise ValueError('Cannot process flags argument with a compiled pattern')
         return pattern

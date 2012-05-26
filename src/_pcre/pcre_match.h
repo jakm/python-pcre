@@ -35,8 +35,11 @@ typedef struct {
 	/* public members */
 	PyObject *re;
 	char *subject;
+	int pos;
+	int endpos;
 	/* private members */
 	int *offsetvector;
+	int stringcount;
 
 } pcre_MatchObject;
 

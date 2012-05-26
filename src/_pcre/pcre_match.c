@@ -25,6 +25,7 @@
  *	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "pcre_module.h";
 #include "pcre_match.h"
 
 static void
@@ -48,20 +49,19 @@ pcre_MatchObject_init(pcre_MatchObject *self, PyObject *args, PyObject *kwds)
 static PyObject *
 pcre_MatchObject_getpos(pcre_MatchObject *self, void *closure)
 {
-	PyErr_SetNone(PyExc_NotImplementedError);
-	return NULL;
+	return Py_BuildValue("i", self->pos);
 }
 
 static PyObject *
 pcre_MatchObject_getendpos(pcre_MatchObject *self, void *closure)
 {
-	PyErr_SetNone(PyExc_NotImplementedError);
-	return NULL;
+	return Py_BuildValue("i", self->endpos);
 }
 
 static PyObject *
 pcre_MatchObject_getlastindex(pcre_MatchObject *self, void *closure)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
@@ -69,6 +69,7 @@ pcre_MatchObject_getlastindex(pcre_MatchObject *self, void *closure)
 static PyObject *
 pcre_MatchObject_getlastgroup(pcre_MatchObject *self, void *closure)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
@@ -100,20 +101,119 @@ static PyGetSetDef pcre_MatchObject_getseters[] = {
 static PyObject *
 pcre_MatchObject_expand(pcre_MatchObject* self)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
 
 static PyObject *
-pcre_MatchObject_group(pcre_MatchObject* self)
+pcre_MatchObject_get_substring(pcre_MatchObject* self, int group)
 {
-	PyErr_SetNone(PyExc_NotImplementedError);
+printf("%s; %p; %i", self->subject, self->offsetvector, self->stringcount);
+	char **substring;
+	int rc = pcre_get_substring(self->subject, self->offsetvector, self->stringcount,
+								group, substring);
+	if (rc < 0) {
+		sprintf(message_buffer,
+				"Picking of substring exited with an error (group = %d, code = %d).", group, rc);
+		PyErr_SetString(PcreError, message_buffer);
+		return NULL;
+	}
+
+	PyObject *result = Py_BuildValue("s", substring);
+	if (result == NULL) {
+		PyErr_SetString(PcreError, "An error when building substring object.");
+		pcre_free(substring);
+		return NULL;
+	}
+
+	pcre_free(substring);
+	Py_INCREF(result);
+	return result;
+}
+
+static PyObject *
+pcre_MatchObject_group(pcre_MatchObject* self, PyObject *args)
+{
+	if (PyTuple_Size(args) == (Py_ssize_t) 0)
+		PyTuple_SetItem(args, 0, Py_BuildValue("i", 0));
+
+	Py_ssize_t size = PyTuple_GET_SIZE(args);
+
+	PyObject *result;
+
+	// method called without parameters
+	if (size == 0) {
+		// pcre_MatchObject_get_substring increases counter of returned object
+		result = pcre_MatchObject_get_substring(self, 0);
+		if (result == NULL)
+			return NULL;
+
+		goto RET;
+	}
+
+	int *groups = (int *) malloc(size * sizeof(int));
+	if (groups == NULL) {
+		PyErr_SetString(PcreError, "An error when allocating groups.");
+		return NULL;
+	}
+
+	for (Py_ssize_t i = 0; i < size; i++) {
+		PyObject *group = PyTuple_GET_ITEM(args, i);
+		groups[i] = (int) PyInt_AsLong(group);
+	}
+
+	if (size == 1) {
+		// pcre_MatchObject_get_substring increases counter of returned object
+		result = pcre_MatchObject_get_substring(self, groups[0]);
+		if (result == NULL)
+			goto ERROR_DEALLOC;
+
+		goto RET;
+	}
+
+	result = PyTuple_New(size);
+	if (result == NULL) {
+		PyErr_SetString(PcreError, "An error when allocating tuple object.");
+		goto ERROR_DEALLOC;
+	}
+
+	Py_ssize_t items_count = 0;
+	for (Py_ssize_t i = 0; i < size; i++) {
+		PyObject *substring = pcre_MatchObject_get_substring(self, groups[i]);
+		if (substring == NULL)
+			// pcre_MatchObject_get_substring sets exception
+			goto ERROR_DECREF_ITEMS;
+
+		if (PyTuple_SetItem(result, i, substring) != 0) {
+			PyErr_SetString(PcreError, "An error when setting tuple item.");
+			goto ERROR_DECREF_ITEMS;
+		}
+		items_count++;
+	}
+
+	Py_INCREF(result);
+
+RET:
+	free(groups);
+	return result;
+
+ERROR_DECREF_ITEMS:
+	for (Py_ssize_t i = 0; i < items_count; i++) {
+		PyObject *item = PyTuple_GET_ITEM(result, i);
+		if (item != NULL)
+			Py_XDECREF(item);
+	}
+
+ERROR_DEALLOC:
+	free(groups);
 	return NULL;
 }
 
 static PyObject *
 pcre_MatchObject_groups(pcre_MatchObject* self)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
@@ -121,6 +221,7 @@ pcre_MatchObject_groups(pcre_MatchObject* self)
 static PyObject *
 pcre_MatchObject_groupdict(pcre_MatchObject* self)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;;
 }
@@ -128,6 +229,7 @@ pcre_MatchObject_groupdict(pcre_MatchObject* self)
 static PyObject *
 pcre_MatchObject_start(pcre_MatchObject* self)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
@@ -135,6 +237,7 @@ pcre_MatchObject_start(pcre_MatchObject* self)
 static PyObject *
 pcre_MatchObject_end(pcre_MatchObject* self)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
@@ -142,13 +245,14 @@ pcre_MatchObject_end(pcre_MatchObject* self)
 static PyObject *
 pcre_MatchObject_span(pcre_MatchObject* self)
 {
+	// TODO
 	PyErr_SetNone(PyExc_NotImplementedError);
 	return NULL;
 }
 
 static PyMethodDef pcre_MatchObject_methods[] = {
 	{"expand", (PyCFunction)pcre_MatchObject_expand, METH_NOARGS, NULL},
-	{"group", (PyCFunction)pcre_MatchObject_group, METH_NOARGS, NULL},
+	{"group", (PyCFunction)pcre_MatchObject_group, METH_VARARGS, NULL},
 	{"groups", (PyCFunction)pcre_MatchObject_groups, METH_NOARGS, NULL},
 	{"groupdict", (PyCFunction)pcre_MatchObject_groupdict, METH_NOARGS, NULL},
 	{"start", (PyCFunction)pcre_MatchObject_start, METH_NOARGS, NULL},
