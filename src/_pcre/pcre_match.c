@@ -100,9 +100,9 @@ pcre_MatchObject_expand(pcre_MatchObject* self)
 static PyObject *
 pcre_MatchObject_get_substring(pcre_MatchObject* self, int group)
 {
-	char **substring;
+	char *substring;
 	int rc = pcre_get_substring(self->subject, self->offsetvector, self->stringcount,
-								group, substring);
+								group, &substring);
 	if (rc < 0) {
 		sprintf(message_buffer,
 				"Picking of substring exited with an error (group = %d, code = %d).", group, rc);
