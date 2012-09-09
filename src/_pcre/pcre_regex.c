@@ -308,7 +308,7 @@ pcre_RegexObject_match(pcre_RegexObject* self, PyObject *args, PyObject *keywds)
 		PyErr_SetString(PcreError, message_buffer); // TODO: rozliseni chybovych kodu
 		goto ERROR;
 	}
-printf("pattern=%s, subject=%s, pos = %d, len = %d, rc = %d\n", self->pattern, subject, pos, substring_len, rc);
+
 	pcre_MatchObject *match = PyObject_New(pcre_MatchObject, &pcre_MatchType);
 	if (match == NULL) {
 		PyErr_SetString(PcreError, "An error when allocating _pcre.MatchObject.");
