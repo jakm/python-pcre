@@ -6,7 +6,7 @@ import sys
 import subprocess
 from distutils.core import setup, Extension
 
-PCRE_VERSION = '8.30'
+PCRE_VERSION = 8.30
 
 def get_pcre_info():
     cmd = 'pcre-config --version --prefix'
@@ -24,7 +24,7 @@ def get_pcre_info():
 
 version, prefix = get_pcre_info()
 
-if version < PCRE_VERSION:
+if float(version) < PCRE_VERSION:
     print >>sys.stderr, 'pcre is required in version >=', PCRE_VERSION
     exit(1)
 
