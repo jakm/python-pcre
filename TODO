@@ -1,3 +1,4 @@
 * fix tests with setup.py
 * fix pcre.__init__.py
 * fix reference counting
+* statické pole chybových kódů -> hlášek pro pcre_study & pcre_exec
